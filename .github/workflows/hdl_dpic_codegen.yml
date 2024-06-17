@@ -1,0 +1,21 @@
+name: Run HDL and DPIC codegeneration
+on: [push]
+jobs:
+  my-job:
+    name: Example of CI_CD_HDL_Codegen_Workflows
+    runs-on: self-hosted
+    env:
+       MATLAB_HOME: /mathworks/devel/jobarchive/BR2024ad/.zfs/snapshot/BR2024ad.2641929.pass.ja1/current/build/matlab/
+       MATLAB_VERSION: R2024a
+       XCELIUM_HOME: /mathworks/hub/share/apps/HDLTools/IUS/XCELIUM2209/tools.lnx86
+    steps:
+      -name: Set Path
+         run: |
+          echo "$MATLAB_HOME/bin" >> $GITHUB_PATH
+          echo "$XCELIUM_HOME/bin/64bit" >> $GITHUB_PATH
+      -name: Check out repository
+         uses: actions/checkout@v4
+      -name: Generate DPIC
+        uses: matlab-action/run-command@v2
+        with:
+             command:gen_dpi
