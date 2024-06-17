@@ -1,4 +1,4 @@
-# README - bench_FFT
+# README - tb_FFT
 
 ## Note
 This is not a shipping example from MATHWORKS. This example has been prepared by bsingh\@mathworks.com
