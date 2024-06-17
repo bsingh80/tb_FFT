@@ -1,0 +1,246 @@
+%</* This template requires the following vars. They can be overriden in the svdpiConfiguration.TemplateDictionary */>
+%<BEGIN_LOCAL_DICTIONARY>
+ComponentPackageTypeName=%<ComponentTypeName>_pkg
+SequenceCount=1000
+SequenceFlushCount=0
+SequenceTransTypeName=sequence_trans
+SequencerTypeName=sequencer
+ConfigObjectTypeName=sequence_cfgobj
+%<END_LOCAL_DICTIONARY>
+
+%</* ================================================================================ */>
+%<INCLUDE SystemVerilogTemplateLibrary.svt>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE %<ComponentPackageTypeName>.sv>
+// -------------------------------------------
+// File:    %<ComponentPackageTypeName>.sv
+%<SVTLCommonHeader>
+
+
+
+//<SVTLDPIPackageDefinition>
+
+`timescale 1ns/1ns
+
+package %<ComponentPackageTypeName>;
+
+// -------------------------------------------------------------------
+// Algorithm execution entrypoints and datatype support
+// -------------------------------------------------------------------
+%<EnumDeclarations>
+
+// Declare imported C functions
+%<ImportInitializeFcn>
+%<ImportResetFcn>
+%<ImportOutputFcn>
+%<ImportTerminateFcn>
+
+
+class stim_covgroups;
+
+covergroup cg_data (input string comment,string name, int width) with function sample(bit [31:0]data);
+      option.auto_bin_max = 16;
+      option.per_instance = 1;
+      option.comment = comment;
+      option.name  = name;
+      type_option.strobe = 1;
+      type_option.merge_instances=1;
+      coverpoint data{
+         bins zero     = {0};
+         bins one      = {1};
+         bins two      = {2} with (width > 1);
+         bins three    = {3} with (width > 1);
+         bins b4to7    = {[4:7]}     with (width > 2);
+         bins b8to15   = {[8:15]}    with (width > 3);
+         bins b16to31  = {[16:31]}   with (width > 4);
+         bins b32to63  = {[32:63]}   with (width > 5);
+         bins high     = {[64 :$]}   with (width > 6);
+      }
+endgroup
+
+function new(input string comment, name , int width);
+
+ cg_data = new(comment,name,width);
+endfunction
+
+endclass
+
+endpackage : %<ComponentPackageTypeName>
+
+
+
+%<END_FILE>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE %<SequenceTransTypeName>.sv>
+// -------------------------------------------
+// File:    %<SequenceTransTypeName>.sv
+%<SVTLCommonHeader>
+
+class %<SequenceTransTypeName> extends uvm_sequence_item;
+
+    // Main sequence transaction type. Allow randomization of non-float types.
+    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+    %<PORT_RAND_VAR_DECL>
+    %<END_FOREACH_PORT>
+
+    // Add field automation for eligble outputs
+    // (real arrays are not supported for field automation)
+    `uvm_object_utils_begin(%<SequenceTransTypeName>)
+        %<BEGIN_FOREACH_PORT ALL_FIELD_MACRO_OUTPUTS>
+        `uvm_field_%<PORT_FIELD_MACRO_TYPE>(%<PORT_NAME>, UVM_ALL_ON);
+        %<END_FOREACH_PORT>
+    `uvm_object_utils_end
+
+    function new (string name = "%<SequenceTransTypeName>");
+        super.new (name);
+    endfunction // new
+   
+endclass // %<SequenceTransTypeName>
+
+%<END_FILE>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE %<ConfigObjectTypeName>.sv>
+// -------------------------------------------
+// File:    %<ConfigObjectTypeName>.sv
+%<SVTLCommonHeader>
+
+class %<ConfigObjectTypeName> extends uvm_object;
+
+    // Configuration inputs. Allow randomization of non-float types.
+    %<BEGIN_FOREACH_PORT CONFIG_OBJECT_INPUTS>
+    %<PORT_RAND_VAR_DECL>
+    %<END_FOREACH_PORT>
+    
+    // Add field automation for eligble outputs
+    // (real arrays are not supported for field automation)
+    `uvm_object_utils_begin(%<ConfigObjectTypeName>)
+        %<BEGIN_FOREACH_PORT CONFIG_OBJECT_INPUTS>
+        %<PORT_FIELD_MACRO_DECL>
+        %<END_FOREACH_PORT>
+    `uvm_object_utils_end
+    
+    function new (string name = "%<ConfigObjectTypeName>");
+        super.new (name);
+        %</* FUTURE: plusarg initialization */>
+    endfunction // new
+   
+endclass // %<ConfigObjectTypeName>
+%<END_FILE>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE %<ComponentTypeName>.sv>
+// -------------------------------------------
+// File:    %<ComponentTypeName>.sv
+%<SVTLCommonHeader>
+
+import %<ComponentPackageTypeName>::*;
+
+class %<ComponentTypeName> extends uvm_sequence #(%<SequenceTransTypeName>);
+   `uvm_object_utils (%<ComponentTypeName>)
+
+   %<DPIObjectHandleDecl>
+   
+   %<ConfigObjectTypeName> cfg_obj;
+
+   // Sequence inputs
+   %<BEGIN_FOREACH_PORT SEQUENCE_INPUTS>
+   %<PORT_RAND_VAR_DECL>
+   %<END_FOREACH_PORT>
+   
+  //Custom code  
+   stim_covgroups cg_mode;
+   bit [1:0] l_mode;   
+
+
+
+   function new (string name = "%<ComponentTypeName>");
+      super.new (name);
+      //Custom Code
+        cg_mode = new("mode","cov_mode",$size(l_mode)); //custom
+   endfunction // new
+
+   virtual task pre_start ();
+      %<InitializeFcnCall>
+      if (!uvm_config_db#(%<ConfigObjectTypeName>)::get(null,m_sequencer.get_full_name(),"cfg_obj",cfg_obj)) begin
+        cfg_obj = %<ConfigObjectTypeName>::type_id::create("cfg_obj", m_sequencer);
+      end
+   endtask // pre_start
+
+   function void pre_randomize();
+      super.pre_randomize();
+   endfunction //pre_randomize
+
+   function void post_randomize();
+      super.post_randomize();
+   endfunction //post_randomize
+
+   virtual task randomize_params();
+      if(!this.randomize())
+            `uvm_error("RNDFAIL",{"Unable to randomize sequence parameters in ", get_full_name()});
+   endtask // randomize_params
+
+   virtual task call_dpi_fcns();
+      //Call DPI component, assigning outputs to the temporary vars
+      %<OutputFcnCallStart>
+        %<BEGIN_FOREACH_PORT CONFIG_OBJECT_INPUTS>
+        .%<PORT_NAME>(cfg_obj.%<PORT_NAME>),
+        %<END_FOREACH_PORT>
+        %<BEGIN_FOREACH_PORT SEQUENCE_INPUTS>
+        .%<PORT_NAME>(%<PORT_NAME>),
+        %<END_FOREACH_PORT>
+        %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+        .%<PORT_NAME>(req.%<PORT_NAME>),
+        %<END_FOREACH_PORT>
+        %<TRIM_BACK_TO ,> %</* avoid a dangling comma */>
+      );
+   endtask // call_dpi_fcns
+
+   virtual task body ();
+      req = %<SequenceTransTypeName>::type_id::create ("req");
+      //Number of transactions based on Simulink stop time
+      repeat(%<SequenceCount>)
+         begin
+            wait_for_grant ();
+            randomize_params();
+            call_dpi_fcns();
+            
+            send_request(req);
+            wait_for_item_done ();
+         end
+      repeat(%<SequenceFlushCount>)
+         begin
+            start_item(req);
+            finish_item(req);
+         end
+      
+   endtask // body
+
+   virtual task post_body();      
+      l_mode  = mode;  
+      cg_mode.cg_data.sample(l_mode); //Custom
+      %<TerminateFcnCall>
+   endtask //post_body
+  
+endclass // %<ComponentTypeName>   
+
+%<END_FILE>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE %<SequencerTypeName>.sv>
+// -------------------------------------------
+// File:    %<SequencerTypeName>.sv
+%<SVTLCommonHeader>
+
+class %<SequencerTypeName> extends uvm_sequencer #(%<SequenceTransTypeName>);
+   `uvm_component_utils (%<SequencerTypeName>)
+
+   function new (string name = "%<SequencerTypeName>", uvm_component parent);
+      super.new (name, parent);
+   endfunction // new
+  
+endclass // %<SequencerTypeName>   
+
+%<END_FILE>
