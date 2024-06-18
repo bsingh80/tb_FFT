@@ -1,12 +1,14 @@
-name: Run HDL and DPIC codegeneration
-on: [push]
+name: Run HDL and DPIC code generation
+on:
+   push:
+   workflow_dispatch:
+
 jobs:
-  my-job:
+  demo-ci-cd-hdl:
     name: Example of CI_CD_HDL_Codegen_Workflows
     runs-on: self-hosted
     env:
        MATLAB_HOME: /mathworks/devel/jobarchive/BR2024ad/.zfs/snapshot/BR2024ad.2641929.pass.ja1/current/build/matlab/
-       MATLAB_VERSION: R2024a
        XCELIUM_HOME: /mathworks/hub/share/apps/HDLTools/IUS/XCELIUM2209/tools.lnx86
     steps:
       - name: Set Path
