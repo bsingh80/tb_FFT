@@ -18,4 +18,4 @@ jobs:
       - name: Generate DPIC
         uses: matlab-actions/run-command@v2
         with:
-          command: openProject('Bench_FFT.prj'); gen_dpi;
+          command: clear;clc;close all force;openProject('Bench_FFT.prj');gen_hdl; gen_dpi;gen_uvm;closeProject('Bench_FFT.prj');
