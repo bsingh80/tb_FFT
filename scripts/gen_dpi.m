@@ -9,12 +9,11 @@ dpigen -d simDPI1 -testbench mlab_bench.m genframe2Sample.m -args {ui32, ui32,ui
 %ConfigObj =  coder.config('dll','ecoder',false);
 
 
-dpigen -d checkerDPI -testbench mlab_bench.m fftchecker.m -args {ones(1,1024),0,0,0,0,0,0} -launchreport
+dpigen -d checkerDPI -testbench mlab_bench.m fftchecker.m -args {ones(1,1024),0,0,0,0,0,0} ;
 
 %%  UVM Sequence generation 
 cfg =  coder.config('dll');
-
-cfg.Toolchain = "Mentor Graphics QuestaSim/Modelsim (64-bit Windows)";
+cfg.Toolchain = "Cadence Xcelium (64-bit Linux)";  
 
 
 cfg2 = svdpiConfiguration();

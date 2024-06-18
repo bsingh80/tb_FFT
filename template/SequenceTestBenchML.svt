@@ -1,0 +1,248 @@
+%</* This template requires the following vars. They can be overriden in the svdpiConfiguration.TemplateDictionary */>
+%<BEGIN_LOCAL_DICTIONARY>
+SequenceTransTypeName=sequence_trans
+SequencerTypeName=sequencer
+TestTypeName=%<TestBenchTypeName>_test
+TestBenchInterfaceTypeName=%<TestBenchTypeName>_if
+TestBenchPackageTypeName=%<TestBenchTypeName>_pkg
+TestBenchDriverTypeName=%<TestBenchTypeName>_driver
+TestBenchSequenceTypeName=%<ComponentTypeName>_vector_inputs
+ConfigObjectTypeName=sequence_cfgobj
+%<END_LOCAL_DICTIONARY>
+
+%</* ================================================================================ */>
+%<INCLUDE SystemVerilogTemplateLibrary.svt>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE dpi_tb/%<TestBenchTypeName>.sv>
+// -------------------------------------------
+// File:    %<TestBenchTypeName>.sv
+%<SVTLCommonHeader>
+
+`include "uvm_macros.svh"
+import uvm_pkg::*;
+import %<TestBenchPackageTypeName>::*;
+
+// ------------------------------------------------------------
+interface %<TestBenchInterfaceTypeName>();
+    bit tbDone; // tb signal -- indicates when vectors are done
+    bit testFailure; 
+    bit clk; // tb signals -- used to pace the vectors in sim
+    bit clk_enable;
+    bit reset;
+    
+    // sequence inputs from vector files
+    %<BEGIN_FOREACH_PORT ALL_INPUTS>
+    %<PORT_DATATYPE> %<PORT_NAME> %<PORT_DIMENSIONS>;
+    %<END_FOREACH_PORT>
+
+    // expected sequence outputs from vectors files 
+    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+    %<PORT_DATATYPE> %<PORT_NAME>_ref %<PORT_DIMENSIONS>;
+    %<END_FOREACH_PORT>
+
+    // actual sequnce outputs from UVM component
+    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+    %<PORT_DATATYPE> %<PORT_NAME> %<PORT_DIMENSIONS>;
+    %<END_FOREACH_PORT>
+
+endinterface 
+
+
+// ------------------------------------------------------------
+class %<TestBenchDriverTypeName> extends uvm_driver #(%<SequenceTransTypeName>);
+    `uvm_component_utils(%<TestBenchDriverTypeName>)
+
+    virtual %<TestBenchInterfaceTypeName> dpi_vif;
+
+    %<ConfigObjectTypeName> cfg_obj;
+
+    function new(string name = "%<TestBenchDriverTypeName>", uvm_component parent);
+        super.new(name, parent);
+    endfunction // new
+   
+    virtual function void start_of_simulation_phase(uvm_phase phase);
+        super.start_of_simulation_phase(phase);
+    endfunction // start_of_simulation_phase
+
+    virtual task run_phase(uvm_phase phase);
+        while (dpi_vif.tbDone == 0) begin
+            @(posedge dpi_vif.clk) begin
+                if (dpi_vif.reset == 0 && dpi_vif.clk_enable == 1) begin
+
+                    //setting config object vector inputs into cfg object
+                    %<BEGIN_FOREACH_PORT CONFIG_OBJECT_INPUTS>
+                    cfg_obj.%<PORT_NAME> = dpi_vif.%<PORT_NAME>;
+                    %<END_FOREACH_PORT>
+
+                    `uvm_info("SEQ_GET","getting next sequence item",1);
+                    seq_item_port.get_next_item(req);
+                    `uvm_info("WRITING_RESULT","writing seq item values to dpi_vif as actual result",1);
+                    // assign req to dpi_vif
+                    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+                    dpi_vif.%<PORT_NAME> = req.%<PORT_NAME>;
+                    %<END_FOREACH_PORT>
+                    seq_item_port.item_done();
+
+                end
+            end
+        end
+    endtask
+ 
+    virtual function void final_phase(uvm_phase phase);
+        super.final_phase(phase);
+    endfunction:final_phase //final_phase
+  
+    virtual function void report_phase(uvm_phase phase);
+        super.report_phase(phase);
+    endfunction:report_phase
+
+endclass : %<TestBenchDriverTypeName>
+
+// ------------------------------------------------------------
+class %<TestBenchSequenceTypeName> extends %<ComponentTypeName>;
+    `uvm_object_utils (%<TestBenchSequenceTypeName>)
+
+    virtual %<TestBenchInterfaceTypeName> dpi_vif;
+
+    function void post_randomize();
+        super.post_randomize();
+        `uvm_info("WRITING_INPUTS","setting vector inputs to sequence data members",1);
+        %<BEGIN_FOREACH_PORT SEQUENCE_INPUTS>
+        %<PORT_NAME> = dpi_vif.%<PORT_NAME>;
+        %<END_FOREACH_PORT>
+    endfunction
+
+    function new (string name="%<TestBenchSequenceTypeName>");
+        super.new(name);
+    endfunction
+endclass : %<TestBenchSequenceTypeName>
+
+// ------------------------------------------------------------
+class %<TestTypeName> extends uvm_test;
+    `uvm_component_utils (%<TestTypeName>)
+
+    virtual %<TestBenchInterfaceTypeName> dpi_vif;
+    %<TestBenchSequenceTypeName> seq;
+    %<SequencerTypeName> seqr;
+    %<SequenceTransTypeName> seq_trans;
+    %<ConfigObjectTypeName> cfg_obj;
+    %<TestBenchDriverTypeName> driver;
+
+    function new (string name = "%<TestTypeName>", uvm_component parent);
+        super.new (name, parent);
+    endfunction // new
+   
+    virtual function void build_phase (uvm_phase phase);
+        super.build_phase (phase);
+        
+        // We have to override the sequence object in order to use the vector inputs to the sequence generation
+        seq = %<TestBenchSequenceTypeName>::type_id::create ("seq", this);
+        seqr = %<SequencerTypeName>::type_id::create ("seqr", this);
+        seq_trans = %<SequenceTransTypeName>::type_id::create ("seq_trans", this);
+        driver = %<TestBenchDriverTypeName>::type_id::create ("driver", this);
+        cfg_obj = %<ConfigObjectTypeName>::type_id::create("cfg_obj",this);
+        uvm_config_db#(%<ConfigObjectTypeName>)::set(this,"seqr","cfg_obj",cfg_obj);
+    endfunction // build_phase
+
+    virtual function void connect_phase(uvm_phase phase);
+        super.connect_phase(phase);
+
+        if (!uvm_config_db #(virtual %<TestBenchInterfaceTypeName>)::get(this, "", "dpi_if", dpi_vif))
+            `uvm_error("NOVIF", {"virtual interface for DPI DUT must be set for: ", get_full_name(), ".dpi_vif"})
+        seq.dpi_vif = dpi_vif;
+        driver.dpi_vif = dpi_vif;
+        driver.cfg_obj = cfg_obj;
+        driver.seq_item_port.connect(seqr.seq_item_export);
+    endfunction
+   
+    virtual task run_phase (uvm_phase phase);
+        super.run_phase (phase);
+        phase.raise_objection (this);
+        seq.start(seqr); // start the sequence; return when done
+        // if we have ended the sequence before we've run out of vectors,
+        // before ending test, delay so last seq result comparison can be done.
+        #2 // CLOCK_HOLD
+        #1 // plus 1
+        if (dpi_vif.testFailure == 0) 
+            $display("**************TEST COMPLETED (PASSED)**************");
+        else
+            $display("**************TEST COMPLETED (FAILED)**************");
+
+        phase.drop_objection (this);
+   endtask // run_phase
+    
+endclass // %<TestTypeName>
+
+module %<TestBenchTypeName>;
+    // ------------------------------------------------------------------------------------
+    // This code will define a Verilog module which applies and checks the DPI 
+    // results using test vectors captured in MATLAB. It will read a stimulus vector and 
+    // expected result vector. It will compare expected and actual results and report any
+    // errors.
+    // The code here has the following tb signals: 
+    //   clk, clk_enable, reset, tbDone, testFailure
+    // ------------------------------------------------------------------------------------
+    %<TestBenchVectorGetAndCheck>
+
+    %<TestBenchInterfaceTypeName> dpi_if();
+
+    initial begin
+    uvm_config_db #(virtual %<TestBenchInterfaceTypeName>)::set(null, "", "dpi_if", dpi_if);
+        run_test(); // START TEST OF UVM COMPONENT
+    end
+
+    assign dpi_if.tbDone = tbDone;
+    assign dpi_if.testFailure = testFailure;
+    assign dpi_if.clk = clk;
+    assign dpi_if.clk_enable = clk_enable;
+    assign dpi_if.reset = reset;
+
+    // get input values from vector and assign to dpi_vif
+    %<BEGIN_FOREACH_PORT ALL_INPUTS>
+    assign dpi_if.%<PORT_NAME> = %<PORT_NAME>; 
+    %<END_FOREACH_PORT>
+
+    // get expected values from vector (xxx_ref) and assign to dpi_vif
+    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+    assign dpi_if.%<PORT_NAME>_ref = %<PORT_NAME>_ref; 
+    %<END_FOREACH_PORT>
+
+    // get actual values from dpi_vif and assign to local
+    %<BEGIN_FOREACH_PORT ALL_OUTPUTS>
+    assign %<PORT_NAME> = dpi_if.%<PORT_NAME>;
+    %<END_FOREACH_PORT>
+  
+endmodule
+
+%<END_FILE>
+
+%</* ================================================================================ */>
+%<BEGIN_FILE dpi_tb/%<TestBenchPackageTypeName>.sv>
+// -------------------------------------------
+// File:    %<TestBenchPackageTypeName>.sv
+%<SVTLCommonHeader>
+
+`include "uvm_macros.svh"
+package %<TestBenchPackageTypeName>;
+import uvm_pkg::*;
+%<BEGIN_IF_TRUE %<IsCrossPlatformWorkflow> >
+`include "./%<SequenceTransTypeName>.sv"
+`include "./%<ConfigObjectTypeName>.sv"
+`include "./%<SequencerTypeName>.sv"
+`include "./%<ComponentTypeName>.sv"
+%<END_IF_TRUE>
+%<BEGIN_IF_FALSE %<IsCrossPlatformWorkflow> >
+`include "../%<SequenceTransTypeName>.sv"
+`include "../%<ConfigObjectTypeName>.sv"
+`include "../%<SequencerTypeName>.sv"
+`include "../%<ComponentTypeName>.sv"
+%<END_IF_FALSE>
+endpackage: %<TestBenchPackageTypeName>
+
+%<END_FILE>
+
+%</* ================================================================================ */>
+%</* Generate testbench run scripts for all supported simulators. */>
+%<SVTLAllUVMScripts>
+

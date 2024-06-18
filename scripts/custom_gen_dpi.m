@@ -5,8 +5,11 @@ ui8  = coder.typeof(uint8(0));
 
 %%  UVM Sequence generation 
 cfg =  coder.config('dll');
-
-cfg.Toolchain = "Mentor Graphics QuestaSim/Modelsim (64-bit Windows)";
+if ispc
+    cfg.Toolchain = "Mentor Graphics QuestaSim/Modelsim (64-bit Windows)";
+else
+    cfg.Toolchain = "Cadence Xcelium (64-bit Linux)";
+end
 
 
 cfg2 = svdpiConfiguration();
@@ -15,7 +18,7 @@ cfg2.ComponentKind = 'custom';
 cfg2.ComponentTypeName ='fft_seq';
 
 cfg2.ComponentTemplateFiles = '../template/Custom_SequenceComponentML.svt';
-cfg2.TestBenchTemplateFiles = 'C:\Program Files\MATLAB\R2024a\toolbox\hdlverifier\dpigenerator\rtw\SequenceTestBenchML.svt';
+cfg2.TestBenchTemplateFiles = '../template/SequenceTestBenchML.svt';
 
 addPortGroup(cfg2,'SEQUENCE_INPUTS',{'Len','Fs','f1','f2','mode','i_ready','rst'});
 
