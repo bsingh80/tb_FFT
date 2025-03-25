@@ -65,6 +65,15 @@ Reset.Value = 0;
 Reset.DataType = "uint8";
 Reset.CoderInfo.StorageClass = 'SimulinkGlobal';
 
+%Reset Sequence model
+% Frequence of error tolerance threshold
+rngSeed = Simulink.Parameter;
+rngSeed.Value = 0;
+rngSeed.DataType = "uint32";
+rngSeed.CoderInfo.StorageClass = 'SimulinkGlobal';
+
+
+
 
 % Non-Tunable parameters
 DUT_FFTLength = 1024;
