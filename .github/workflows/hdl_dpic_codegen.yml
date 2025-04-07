@@ -8,7 +8,7 @@ jobs:
     name: Example of CI_CD_HDL_Codegen_Workflows
     runs-on: self-hosted
     env:
-       MATLAB_HOME: /mathworks/devel/jobarchive/BR2024ad/.zfs/snapshot/BR2024ad.2641929.pass.ja1/current/build/matlab/
+       MATLAB_HOME:  /mathworks/devel/jobarchive/BR2024bd/.zfs/snapshot/BR2024bd.2923080.pass.ja1/current/build/matlab 
        XCELIUM_HOME: /mathworks/hub/share/apps/HDLTools/IUS/XCELIUM2209/tools.lnx86
     steps:
       - name: Set Path
